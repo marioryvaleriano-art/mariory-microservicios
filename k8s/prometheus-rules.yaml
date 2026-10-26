@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: bodega-peirano-alertas
+  namespace: bodega-peirano
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: bodega-peirano-servicios
+      rules:
+        # ── Alerta 1: Servicio A caído ──
+        - alert: CatalogoServiceDown
+          expr: up{service="catalogo-service"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Catálogo de Vinos caído"
+            description: "El health check de catalogo-service no responde. Los pedidos no pueden validar stock."
+
+        # ── Alerta 2: Servicio B caído ──
+        - alert: PedidosServiceDown
+          expr: up{service="pedidos-service"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pedidos API caído"
+            description: "El health check de pedidos-service no responde. Los clientes no pueden hacer pedidos."
+
+        # ── Alerta 3 (negocio): stock bajo ──
+        - alert: StockBajoEnBodega
+          expr: bodega_catalogo_stock_total < 100
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Stock total bajo en Bodega Peirano"
+            description: "Quedan {{ $value }} botellas en inventario. Riesgo de no poder atender pedidos."
+
+        # ── Alerta 4 (negocio): consultas a productos inexistentes ──
+        - alert: ConsultasProductoNoEncontrado
+          expr: rate(bodega_catalogo_consultas_total{resultado="no_encontrado"}[5m]) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Muchas consultas a vinos inexistentes"
+            description: "Pedidos está consultando vinos que no existen en el catálogo. Posible desincronización de datos."
